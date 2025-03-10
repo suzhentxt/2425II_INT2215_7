@@ -1,18 +1,32 @@
-CXX = g++
-CXXFLAGS = -Wall -I src/include 
-LDFLAGS = -L src/lib -lmingw32 -lSDL2main -lSDL2 -lSDL2_image
+# Makefile cho project AI City Defense
 
-SRCS = main.cpp
-OBJS = $(SRCS:.cpp=.o)
-TARGET = game
+# Compiler
+CC = g++
+
+# Flags
+CFLAGS = -Wall -I src/include
+
+# Linker flags
+LDFLAGS = -Lsrc/lib -lSDL2 -lmingw32 -lSDL2main
+
+# Tên file thực thi
+TARGET = CityDefense
+
+# File nguồn
+SOURCES = src/main.cpp  # Chỉ định rõ đường dẫn đến main.cpp
+
+# File đối tượng
+OBJECTS = $(SOURCES:.cpp=.o)
 
 all: $(TARGET)
 
-$(TARGET): $(OBJS)
-	$(CXX) $(OBJS) -o $(TARGET) $(LDFLAGS)
+$(TARGET): $(OBJECTS)
+	$(CC) $(OBJECTS) -o $(TARGET) $(LDFLAGS)
 
 %.o: %.cpp
-	$(CXX) $(CXXFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -f $(OBJS) $(TARGET)
+	rm -f $(OBJECTS) $(TARGET)
+
+.PHONY: all clean
