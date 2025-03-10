@@ -5,6 +5,7 @@
 #include <cmath>
 #include <utility>
 #include <iostream>
+#include <algorithm> // Thêm header để dùng reverse và remove_if
 
 using namespace std;
 
@@ -21,7 +22,7 @@ struct Node {
 struct Enemy {
     int gridX, gridY; // Vị trí trên lưới
     vector<pair<int, int>> path; // Đường đi từ Dijkstra
-    int pathIndex;    // Vị trí hiện tại trong đường đi
+    size_t pathIndex; // Vị trí hiện tại trong đường đi (đổi thành size_t)
     int hp;           // Máu
     float speed;      // Tốc độ
     float speedBoost; // Tăng tốc khi bị bắn
@@ -96,7 +97,7 @@ vector<pair<int, int>> dijkstra(vector<vector<Node>>& grid, int startX, int star
         int prevY = grid[y][x].prevY;
         x = prevX; y = prevY;
     }
-    reverse(path.begin(), path.end());
+    std::reverse(path.begin(), path.end()); // Sửa: Dùng std::reverse
 
     if (path.empty() || path[0] != make_pair(startX, startY)) {
         return vector<pair<int, int>>(); // Không tìm được đường
@@ -121,12 +122,12 @@ int main(int argc, char* argv[]) {
     vector<Tower> towers;
     int cityHP = 100;
     int wave = 1; // Đợt hiện tại
-    int enemiesInWave = 3; // Số kẻ thù mỗi đợt
+    size_t enemiesInWave = 3; // Số kẻ thù mỗi đợt (đổi thành size_t)
     int waveTimer = 0; // Đếm thời gian giữa các đợt
     bool running = true;
     SDL_Event event;
 
-    // Đánh dấu thành phố tại (9, 5) là chướng ngại (không cho kẻ thù đi qua ô này)
+    // Đánh dấu thành phố tại (9, 5) là chướng ngại
     grid[5][9].blocked = true;
 
     while (running) {
@@ -209,7 +210,7 @@ int main(int argc, char* argv[]) {
         }
 
         // Xóa kẻ thù chết
-        enemies.erase(remove_if(enemies.begin(), enemies.end(), [](Enemy& e) { return e.hp <= 0; }), enemies.end());
+        enemies.erase(std::remove_if(enemies.begin(), enemies.end(), [](Enemy& e) { return e.hp <= 0; }), enemies.end()); // Sửa: Dùng std::remove_if
 
         // Render
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
