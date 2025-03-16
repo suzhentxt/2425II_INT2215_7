@@ -1,21 +1,31 @@
 # Makefile cho project AI City Defense
 
 # Compiler
-CC = g++
+CC = x86_64-w64-mingw32-g++
 
 # Flags
 CFLAGS = -Wall -I src/include
 
-# Linker flags
-LDFLAGS = -Lsrc/lib -lSDL2 -lmingw32 -lSDL2main
+# Linker flags (bao gồm SDL2_mixer)
+LDFLAGS = -Lsrc/lib -lmingw32 -lSDL2main -lSDL2 -lSDL2_ttf -lSDL2_mixer -lucrt
 
 # Tên file thực thi
 TARGET = CityDefense
 
-# File nguồn
-SOURCES = src/main.cpp  # Chỉ định rõ đường dẫn đến main.cpp
+# Danh sách file nguồn (bao gồm các file bổ sung Vector2D.cpp và MathAddon.cpp)
+SOURCES = src/main.cpp \
+          src/Game.cpp \
+          src/Level.cpp \
+          src/Timer.cpp \
+          src/TextureLoader.cpp \
+          src/SoundLoader.cpp \
+          src/Turret.cpp \
+          src/Unit.cpp \
+          src/Projectile.cpp \
+          src/Vector2D.cpp \
+          src/MathAddon.cpp
 
-# File đối tượng
+# Tạo danh sách file đối tượng từ danh sách file nguồn
 OBJECTS = $(SOURCES:.cpp=.o)
 
 all: $(TARGET)
