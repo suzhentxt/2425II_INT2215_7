@@ -23,7 +23,8 @@ SOURCES = src/main.cpp \
           src/Unit.cpp \
           src/Projectile.cpp \
           src/Vector2D.cpp \
-          src/MathAddon.cpp
+          src/MathAddon.cpp \
+          src/BackgroundSelector.cpp
 
 # Tạo danh sách file đối tượng từ danh sách file nguồn
 OBJECTS = $(SOURCES:.cpp=.o)

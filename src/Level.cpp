@@ -1,61 +1,99 @@
 #include "Level.h"
-
+#include <iostream>
 
 
 Level::Level(SDL_Renderer* renderer, int setTileCountX, int setTileCountY, const std::string& backgroundFile) :
     tileCountX(setTileCountX), tileCountY(setTileCountY),
     targetX(setTileCountX / 2), targetY(setTileCountY / 2) {
-    // Try to load background texture with the specified file
     
-    // First try with the provided filename
-    textureBackground = TextureLoader::loadTexture(renderer, backgroundFile.c_str());
+    // Try multiple approaches to load the background texture
+    std::vector<std::string> pathsToTry = {
+        backgroundFile,                        // Original path
+        "./" + backgroundFile,                 // With explicit current directory
+        "../" + backgroundFile,                // Parent directory
+        "assets/" + backgroundFile,            // Assets folder
+        "data/" + backgroundFile,              // Data folder
+        "resources/" + backgroundFile          // Resources folder
+    };
     
-    // If that fails, try alternate extensions
-    if (textureBackground == nullptr) {
-        // Try changing extension to .bmp if it's not already
-        std::string altFile = backgroundFile;
-        if (altFile.length() > 4) {
-            std::string ext = altFile.substr(altFile.length() - 4);
-            if (ext == ".bmg") {
-                altFile = altFile.substr(0, altFile.length() - 4) + ".bmp";
-            } else if (ext == ".bmp") {
-                altFile = altFile.substr(0, altFile.length() - 4) + ".bmg";
-            }
-            textureBackground = TextureLoader::loadTexture(renderer, altFile.c_str());
+    // Also try alternative extensions if loading fails
+    std::vector<std::string> extensions = {".bmp", ".png", ".jpg"};
+    
+    std::cout << "Attempting to load background: " << backgroundFile << std::endl;
+    
+    // First try direct paths with different prefixes
+    for (const auto& path : pathsToTry) {
+        textureBackground = TextureLoader::loadTexture(renderer, path.c_str());
+        if (textureBackground != nullptr) {
+            std::cout << "Successfully loaded background from: " << path << std::endl;
+            break;
+        } else {
+            std::cout << "Failed to load from: " << path << " - " << SDL_GetError() << std::endl;
         }
     }
     
-    // If TextureLoader fails, try direct SDL loading
+    // If still not loaded, try different extensions
     if (textureBackground == nullptr) {
-        SDL_Log("Failed to load background texture with TextureLoader, trying direct SDL loading");
+        std::string baseName = backgroundFile;
         
-        // Try with different paths and extensions
-        SDL_Surface* surface = SDL_LoadBMP(backgroundFile.c_str());
-        if (surface == nullptr) {
-            // Try with alternate extension
-            std::string altFile = backgroundFile;
-            if (altFile.length() > 4) {
-                std::string ext = altFile.substr(altFile.length() - 4);
-                if (ext == ".bmg") {
-                    altFile = altFile.substr(0, altFile.length() - 4) + ".bmp";
-                } else if (ext == ".bmp") {
-                    altFile = altFile.substr(0, altFile.length() - 4) + ".bmg";
+        // Remove extension if present
+        size_t dotPos = baseName.find_last_of('.');
+        if (dotPos != std::string::npos) {
+            baseName = baseName.substr(0, dotPos);
+        }
+        
+        // Try each extension
+        for (const auto& ext : extensions) {
+            for (const auto& path : pathsToTry) {
+                std::string pathWithExt = path;
+                
+                // Replace extension if path already has one
+                dotPos = pathWithExt.find_last_of('.');
+                if (dotPos != std::string::npos) {
+                    pathWithExt = pathWithExt.substr(0, dotPos) + ext;
                 }
-                surface = SDL_LoadBMP(altFile.c_str());
+                
+                std::cout << "Trying with alternate extension: " << pathWithExt << std::endl;
+                textureBackground = TextureLoader::loadTexture(renderer, pathWithExt.c_str());
+                if (textureBackground != nullptr) {
+                    std::cout << "Successfully loaded background from: " << pathWithExt << std::endl;
+                    break;
+                }
             }
+            if (textureBackground != nullptr) break;
         }
-        if (surface == nullptr) {
-            surface = SDL_LoadBMP(("./"+backgroundFile).c_str());
+    }
+    
+    // Last resort: Create a colored background if texture loading failed
+    if (textureBackground == nullptr) {
+        std::cout << "Failed to load background texture, creating a fallback surface..." << std::endl;
+        
+        // Choose color based on filename to somewhat match the intended bg
+        Uint8 r = 100, g = 150, b = 100; // Default green-ish
+        
+        if (backgroundFile.find("bg2") != std::string::npos) {
+            // Desert-like color for bg2
+            r = 210; g = 180; b = 140;
+        } 
+        else if (backgroundFile.find("bg3") != std::string::npos) {
+            // Bluish color for bg3
+            r = 180; g = 200; b = 220;
         }
         
+        // Create a surface with the chosen color
+        SDL_Surface* surface = SDL_CreateRGBSurface(0, tileCountX * 64, tileCountY * 64, 32, 0, 0, 0, 0);
         if (surface != nullptr) {
+            SDL_FillRect(surface, NULL, SDL_MapRGB(surface->format, r, g, b));
             textureBackground = SDL_CreateTextureFromSurface(renderer, surface);
             SDL_FreeSurface(surface);
-        } else {
-            SDL_Log("All attempts to load background failed: %s", SDL_GetError());
+            
+            if (textureBackground != nullptr) {
+                std::cout << "Created fallback background texture" << std::endl;
+            }
         }
     }
     
+    // Load other textures
     textureTileWall = TextureLoader::loadTexture(renderer, "Tile Wall.bmp");
     textureTileTarget = TextureLoader::loadTexture(renderer, "City.bmp");
     textureTileEnemySpawner = TextureLoader::loadTexture(renderer, "Tile Enemy Spawner.bmp");
@@ -97,19 +135,31 @@ void Level::draw(SDL_Renderer* renderer, int tileSize) {
     // Draw background if available
     bool backgroundDrawn = false;
     if (textureBackground != nullptr) {
+        std::cout << "Attempting to render background texture" << std::endl;
         // Create a rect covering the entire level area
         SDL_Rect bgRect = { 0, 0, levelWidth, levelHeight };
         
-        // Draw the background texture
-        if (SDL_RenderCopy(renderer, textureBackground, NULL, &bgRect) == 0) {
-            backgroundDrawn = true;
+        // Verify texture is still valid
+        int w, h;
+        if (SDL_QueryTexture(textureBackground, NULL, NULL, &w, &h) == 0) {
+            std::cout << "Background texture is valid, dimensions: " << w << "x" << h << std::endl;
+            // Draw the background texture
+            if (SDL_RenderCopy(renderer, textureBackground, NULL, &bgRect) == 0) {
+                backgroundDrawn = true;
+                std::cout << "Successfully rendered background" << std::endl;
+            } else {
+                std::cout << "Failed to render background texture: " << SDL_GetError() << std::endl;
+            }
         } else {
-            SDL_Log("Failed to render background texture: %s", SDL_GetError());
+            std::cout << "Background texture is invalid: " << SDL_GetError() << std::endl;
         }
+    } else {
+        std::cout << "Background texture is null" << std::endl;
     }
     
     // Draw the checkerboard background only if no background image was drawn
     if (!backgroundDrawn) {
+        std::cout << "Drawing fallback checkerboard background" << std::endl;
         for (int y = 0; y < tileCountY; y++) {
             for (int x = 0; x < tileCountX; x++) {
                 if ((x + y) % 2 == 0)
@@ -159,7 +209,6 @@ void Level::draw(SDL_Renderer* renderer, int tileSize) {
         }
     }
 }
-
 
 
 void Level::drawTile(SDL_Renderer* renderer, int x, int y, int tileSize) {

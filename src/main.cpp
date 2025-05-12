@@ -4,39 +4,10 @@
 #include "SDL2/SDL_mixer.h"
 #include "SDL2/SDL_ttf.h"
 #include "Game.h"
-
-
-// Function for background selection menu
-std::string selectBackground() {
-    int choice = 0;
-    std::string backgroundOptions[] = { "bg1.bmp", "bg2.bmp", "bg3.bmp" };
-    
-    std::cout << "===============================" << std::endl;
-    std::cout << "      CITY DEFENSE GAME        " << std::endl;
-    std::cout << "===============================" << std::endl;
-    std::cout << "Select a background image:" << std::endl;
-    std::cout << "1. Background 1" << std::endl;
-    std::cout << "2. Background 2" << std::endl;
-    std::cout << "3. Background 3" << std::endl;
-    std::cout << "Enter your choice (1-3): ";
-    
-    std::cin >> choice;
-    
-    // Validate input
-    while (choice < 1 || choice > 3 || std::cin.fail()) {
-        std::cin.clear(); // Clear error flags
-        std::cin.ignore(100, '\n'); // Ignore incorrect input
-        std::cout << "Invalid choice. Please enter a number between 1 and 3: ";
-        std::cin >> choice;
-    }
-    
-    return backgroundOptions[choice - 1];
-}
-
+#include "BackgroundSelector.h"
 
 int main(int argc, char* args[]) {
-	//Seed the random number generator with the current time so that it will generate different 
-	//numbers every time the game is run.
+	// Seed the random number generator
 	srand((unsigned)time(NULL));
 
 	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) < 0) {
@@ -50,62 +21,95 @@ int main(int argc, char* args[]) {
 			return 1;
 		}
 
-		//Setup the audio mixer.
+		// Setup the audio mixer
 		bool isSDLMixerLoaded = (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 1024) == 0);
 		if (isSDLMixerLoaded == false) {
 			std::cout << "Error: Couldn't initialize Mix_OpenAudio = " << Mix_GetError() << std::endl;
 		}
 		else {
 			Mix_AllocateChannels(32);
-
-			//Output the name of the audio driver.
 			std::cout << "Audio driver = " << SDL_GetCurrentAudioDriver() << std::endl;
 		}
 
-        // Choose background before creating the window
-        std::string selectedBackground = selectBackground();
-        std::cout << "Starting game with background: " << selectedBackground << std::endl;
-
-		//Create the window.
+		// Create the window
 		SDL_Window* window = SDL_CreateWindow("City Defense", 
 			SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 960, 576, 0);
+			
 		if (window == nullptr) {
 			std::cout << "Error: Couldn't create window = " << SDL_GetError() << std::endl;
 			return 1;
 		}
 		else {
-			//Create a renderer for GPU accelerated drawing.
-			SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | 
-				SDL_RENDERER_PRESENTVSYNC);
+			// Create a renderer
+			SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, 
+                               SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+                               
 			if (renderer == nullptr) {
 				std::cout << "Error: Couldn't create renderer = " << SDL_GetError() << std::endl;
 				return 1;
 			}
 			else {
-				//Ensure transparent graphics are drawn correctly.
+				// Ensure transparent graphics are drawn correctly
 				SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
 
-				//Output the name of the render driver.
+				// Output renderer information
 				SDL_RendererInfo rendererInfo;
 				SDL_GetRendererInfo(renderer, &rendererInfo);
 				std::cout << "Renderer = " << rendererInfo.name << std::endl;
 
-				//Get the dimensions of the window.
+				// Get window dimensions
 				int windowWidth = 0, windowHeight = 0;
 				SDL_GetWindowSize(window, &windowWidth, &windowHeight);
 
-				//Start the game with the selected background
+                // Visual background selection menu
+                std::string selectedBackground = "bg1.bmp"; // Default in case selection fails
+                
+                {
+                    BackgroundSelection bgSelection(renderer, windowWidth, windowHeight);
+                    bool selectionRunning = true;
+                    
+                    while (selectionRunning) {
+                        SDL_Event event;
+                        while (SDL_PollEvent(&event)) {
+                            if (event.type == SDL_QUIT) {
+                                selectionRunning = false;
+                                // Exit entire application
+                                SDL_DestroyRenderer(renderer);
+                                SDL_DestroyWindow(window);
+                                TTF_Quit();
+                                SDL_Quit();
+                                return 0;
+                            }
+                            
+                            std::string selected = bgSelection.update(event);
+                            if (!selected.empty()) {
+                                selectedBackground = selected;
+                                selectionRunning = false;
+                                break;
+                            }
+                        }
+                        
+                        if (selectionRunning) {
+                            bgSelection.draw(renderer);
+                            SDL_Delay(16); // ~60fps
+                        }
+                    }
+                }
+                
+                std::cout << "Starting game with background: " << selectedBackground << std::endl;
+                
+				// Start the game with selected background
 				Game game(window, renderer, windowWidth, windowHeight, selectedBackground);
 
-				//Clean up.
+				// Clean up renderer
 				SDL_DestroyRenderer(renderer);
 			}
 
-			//Clean up.
+			// Clean up window
 			SDL_DestroyWindow(window);
 		}
 
-		//Clean up.
+		// Clean up audio
 		if (isSDLMixerLoaded) {
 			Mix_CloseAudio();
 			Mix_Quit();
