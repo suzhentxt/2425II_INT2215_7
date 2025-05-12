@@ -29,18 +29,22 @@ private:
 
 public:
 	// Modified constructor to accept background filename
-	Level(SDL_Renderer* renderer, int setTileCountX, int setTileCountY, const std::string& backgroundFile = "bg1.bmp");
-	void draw(SDL_Renderer* renderer, int tileSize);
+	Level(SDL_Renderer* renderer, int tileCountX, int tileCountY, const std::string& backgroundFile);
+	~Level();
 
-	Vector2D getRandomEnemySpawnerLocation();
-	bool isTileWall(int x, int y);
-	void setTileWall(int x, int y, bool setWall);
-	Vector2D getTargetPos();
-	Vector2D getFlowNormal(int x, int y);
+	void draw(SDL_Renderer* renderer, int tileSize);
+	void setTileWall(int x, int y, bool isWall);
+	bool isTileWall(int x, int y) const;
+	Vector2D getRandomEnemySpawnerLocation() const;
+	void clearWalls();
+	void loadBackground(SDL_Renderer* renderer, const std::string& backgroundFile);
+
+	Vector2D getTargetPos() const;
+	Vector2D getFlowNormal(int x, int y) const;
 
 
 private:
-	TileType getTileType(int x, int y);
+	TileType getTileType(int x, int y) const;
 	void setTileType(int x, int y, TileType tileType);
 	void drawTile(SDL_Renderer* renderer, int x, int y, int tileSize);
 	void calculateFlowField();

@@ -216,8 +216,8 @@ void Level::drawTile(SDL_Renderer* renderer, int x, int y, int tileSize) {
     SDL_Texture* textureSelected = textureTileEmpty;
 
     //Ensure that the input tile exists.
-    int index = x + y * tileCountX;
-    if (index > -1 && index < listTiles.size() &&
+    size_t index = static_cast<size_t>(x + y * tileCountX);
+    if (index < listTiles.size() &&
         x > -1 && x < tileCountX &&
         y > -1 && y < tileCountY) {
         Tile& tileSelected = listTiles[index];
@@ -239,7 +239,6 @@ void Level::drawTile(SDL_Renderer* renderer, int x, int y, int tileSize) {
             textureSelected = textureTileArrowLeft;
         else if (tileSelected.flowDirectionX == -1 && tileSelected.flowDirectionY == -1)
             textureSelected = textureTileArrowUpLeft;
-
     }
 
     //Draw the tile.
@@ -251,13 +250,13 @@ void Level::drawTile(SDL_Renderer* renderer, int x, int y, int tileSize) {
 
 
 
-Vector2D Level::getRandomEnemySpawnerLocation() {
+Vector2D Level::getRandomEnemySpawnerLocation() const {
     //Create a list of all tiles that are enemy spawners.
     std::vector<int> listSpawnerIndices;
-    for (int count = 0; count < listTiles.size(); count++) {
-        auto& tileSelected = listTiles[count];
+    for (size_t count = 0; count < listTiles.size(); count++) {
+        const auto& tileSelected = listTiles[count];
         if (tileSelected.type == TileType::enemySpawner)
-            listSpawnerIndices.push_back(count);
+            listSpawnerIndices.push_back(static_cast<int>(count));
     }
 
     //If one or more spawners are found, pick one at random and output it's center position.
@@ -271,20 +270,20 @@ Vector2D Level::getRandomEnemySpawnerLocation() {
 
 
 
-bool Level::isTileWall(int x, int y) {
+bool Level::isTileWall(int x, int y) const {
     return (getTileType(x, y) == TileType::wall);
 }
 
 
-void Level::setTileWall(int x, int y, bool setWall) {
+void Level::setTileWall(int x, int y, bool isWall) {
     if (getTileType(x, y) != TileType::enemySpawner)
-        setTileType(x, y, (setWall ? TileType::wall : TileType::empty));
+        setTileType(x, y, (isWall ? TileType::wall : TileType::empty));
 }
 
 
-Level::TileType Level::getTileType(int x, int y) {
-    int index = x + y * tileCountX;
-    if (index > -1 && index < listTiles.size() &&
+Level::TileType Level::getTileType(int x, int y) const {
+    size_t index = static_cast<size_t>(x + y * tileCountX);
+    if (index < listTiles.size() &&
         x > -1 && x < tileCountX &&
         y > -1 && y < tileCountY)
         return listTiles[index].type;
@@ -294,8 +293,8 @@ Level::TileType Level::getTileType(int x, int y) {
 
 
 void Level::setTileType(int x, int y, TileType tileType) {
-    int index = x + y * tileCountX;
-    if (index > -1 && index < listTiles.size() &&
+    size_t index = static_cast<size_t>(x + y * tileCountX);
+    if (index < listTiles.size() &&
         x > -1 && x < tileCountX &&
         y > -1 && y < tileCountY) {
         listTiles[index].type = tileType;
@@ -305,15 +304,15 @@ void Level::setTileType(int x, int y, TileType tileType) {
 
 
 
-Vector2D Level::getTargetPos() {
+Vector2D Level::getTargetPos() const {
     return Vector2D((float)targetX + 0.5f, (float)targetY + 0.5f);
 }
 
 
 void Level::calculateFlowField() {
     //Ensure the target is in bounds.
-    int indexTarget = targetX + targetY * tileCountX;
-    if (indexTarget > -1 && indexTarget < listTiles.size() &&
+    size_t indexTarget = static_cast<size_t>(targetX + targetY * tileCountX);
+    if (indexTarget < listTiles.size() &&
         targetX > -1 && targetX < tileCountX &&
         targetY > -1 && targetY < tileCountY) {
 
@@ -332,10 +331,10 @@ void Level::calculateFlowField() {
 
 
 void Level::calculateDistances() {
-    int indexTarget = targetX + targetY * tileCountX;
+    size_t indexTarget = static_cast<size_t>(targetX + targetY * tileCountX);
 
     //Create a queue that will contain the indices to be checked.
-    std::queue<int> listIndicesToCheck;
+    std::queue<size_t> listIndicesToCheck;
     //Set the target tile's flow value to 0 and add it to the queue.
     listTiles[indexTarget].flowDistance = 0;
     listIndicesToCheck.push(indexTarget);
@@ -345,17 +344,17 @@ void Level::calculateDistances() {
 
     //Loop through the queue and assign distance to each tile.
     while (listIndicesToCheck.empty() == false) {
-        int indexCurrent = listIndicesToCheck.front();
+        size_t indexCurrent = listIndicesToCheck.front();
         listIndicesToCheck.pop();
 
         //Check each of the neighbors;
         for (int count = 0; count < 4; count++) {
-            int neighborX = listNeighbors[count][0] + indexCurrent % tileCountX;
-            int neighborY = listNeighbors[count][1] + indexCurrent / tileCountX;
-            int indexNeighbor = neighborX + neighborY * tileCountX;
+            int neighborX = listNeighbors[count][0] + static_cast<int>(indexCurrent % tileCountX);
+            int neighborY = listNeighbors[count][1] + static_cast<int>(indexCurrent / tileCountX);
+            size_t indexNeighbor = static_cast<size_t>(neighborX + neighborY * tileCountX);
 
             //Ensure that the neighbor exists and isn't a wall.
-            if (indexNeighbor > -1 && indexNeighbor < listTiles.size() && 
+            if (indexNeighbor < listTiles.size() && 
                 neighborX > -1 && neighborX < tileCountX &&
                 neighborY > -1 && neighborY < tileCountY &&
                 listTiles[indexNeighbor].type != TileType::wall) {
@@ -378,7 +377,7 @@ void Level::calculateFlowDirections() {
         {-1, 0}, {-1, 1}, {0, 1}, {1, 1},
         {1, 0}, {1, -1}, {0, -1}, {-1, -1} };
 
-    for (int indexCurrent = 0; indexCurrent < listTiles.size(); indexCurrent++) {
+    for (size_t indexCurrent = 0; indexCurrent < listTiles.size(); indexCurrent++) {
         //Ensure that the tile has been assigned a distance value.
         if (listTiles[indexCurrent].flowDistance != flowDistanceMax) {
             //Set the best distance to the current tile's distance.
@@ -389,12 +388,12 @@ void Level::calculateFlowDirections() {
                 int offsetX = listNeighbors[count][0];
                 int offsetY = listNeighbors[count][1];
 
-                int neighborX = offsetX + indexCurrent % tileCountX;
-                int neighborY = offsetY + indexCurrent / tileCountX;
-                int indexNeighbor = neighborX + neighborY * tileCountX;
+                int neighborX = offsetX + static_cast<int>(indexCurrent % tileCountX);
+                int neighborY = offsetY + static_cast<int>(indexCurrent / tileCountX);
+                size_t indexNeighbor = static_cast<size_t>(neighborX + neighborY * tileCountX);
 
                 //Ensure that the neighbor exists.
-                if (indexNeighbor > -1 && indexNeighbor < listTiles.size() &&
+                if (indexNeighbor < listTiles.size() &&
                     neighborX > -1 && neighborX < tileCountX &&
                     neighborY > -1 && neighborY < tileCountY) {
                     //If the current neighbor's distance is lower than the best then use it.
@@ -411,12 +410,92 @@ void Level::calculateFlowDirections() {
 
 
 
-Vector2D Level::getFlowNormal(int x, int y) {
-    int index = x + y * tileCountX;
-    if (index > -1 && index < listTiles.size() &&
+Vector2D Level::getFlowNormal(int x, int y) const {
+    size_t index = static_cast<size_t>(x + y * tileCountX);
+    if (index < listTiles.size() &&
         x > -1 && x < tileCountX &&
         y > -1 && y < tileCountY)
         return Vector2D((float)listTiles[index].flowDirectionX, (float)listTiles[index].flowDirectionY).normalize();
 
     return Vector2D();
+}
+
+void Level::clearWalls() {
+    // Clear all walls by setting all tiles to empty
+    for (auto& tile : listTiles) {
+        if (tile.type == TileType::wall) {
+            tile.type = TileType::empty;
+        }
+    }
+    calculateFlowField();
+}
+
+void Level::loadBackground(SDL_Renderer* renderer, const std::string& backgroundFile) {
+    // Free existing texture if any
+    if (textureBackground != nullptr) {
+        SDL_DestroyTexture(textureBackground);
+        textureBackground = nullptr;
+    }
+
+    // Try to load the background texture
+    textureBackground = TextureLoader::loadTexture(renderer, backgroundFile);
+    if (textureBackground == nullptr) {
+        std::cout << "Failed to load background texture: " << backgroundFile << std::endl;
+    }
+}
+
+Level::~Level() {
+    // Clean up SDL textures
+    if (textureBackground != nullptr) {
+        SDL_DestroyTexture(textureBackground);
+        textureBackground = nullptr;
+    }
+    if (textureTileWall != nullptr) {
+        SDL_DestroyTexture(textureTileWall);
+        textureTileWall = nullptr;
+    }
+    if (textureTileTarget != nullptr) {
+        SDL_DestroyTexture(textureTileTarget);
+        textureTileTarget = nullptr;
+    }
+    if (textureTileEnemySpawner != nullptr) {
+        SDL_DestroyTexture(textureTileEnemySpawner);
+        textureTileEnemySpawner = nullptr;
+    }
+    if (textureTileEmpty != nullptr) {
+        SDL_DestroyTexture(textureTileEmpty);
+        textureTileEmpty = nullptr;
+    }
+    if (textureTileArrowUp != nullptr) {
+        SDL_DestroyTexture(textureTileArrowUp);
+        textureTileArrowUp = nullptr;
+    }
+    if (textureTileArrowUpRight != nullptr) {
+        SDL_DestroyTexture(textureTileArrowUpRight);
+        textureTileArrowUpRight = nullptr;
+    }
+    if (textureTileArrowRight != nullptr) {
+        SDL_DestroyTexture(textureTileArrowRight);
+        textureTileArrowRight = nullptr;
+    }
+    if (textureTileArrowDownRight != nullptr) {
+        SDL_DestroyTexture(textureTileArrowDownRight);
+        textureTileArrowDownRight = nullptr;
+    }
+    if (textureTileArrowDown != nullptr) {
+        SDL_DestroyTexture(textureTileArrowDown);
+        textureTileArrowDown = nullptr;
+    }
+    if (textureTileArrowDownLeft != nullptr) {
+        SDL_DestroyTexture(textureTileArrowDownLeft);
+        textureTileArrowDownLeft = nullptr;
+    }
+    if (textureTileArrowLeft != nullptr) {
+        SDL_DestroyTexture(textureTileArrowLeft);
+        textureTileArrowLeft = nullptr;
+    }
+    if (textureTileArrowUpLeft != nullptr) {
+        SDL_DestroyTexture(textureTileArrowUpLeft);
+        textureTileArrowUpLeft = nullptr;
+    }
 }

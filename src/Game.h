@@ -28,6 +28,13 @@ private:
 		victory
 	} gameState = GameState::playing;
 
+	// Try Again button
+	struct Button {
+		SDL_Rect rect;
+		SDL_Texture* texture = nullptr;
+		bool hover = false;
+	} tryAgainButton;
+
 public:
 	// Modified constructor to accept background file name
 	Game(SDL_Window* window, SDL_Renderer* renderer, int windowWidth, int windowHeight, const std::string& backgroundFile = "bg1.bmp");
@@ -46,6 +53,8 @@ private:
 	void removeTurretsAtMousePosition(Vector2D posMouse);
 	void drawGameState(SDL_Renderer* renderer);
 	void drawPlacementPreview(SDL_Renderer* renderer, Vector2D mousePos);
+	void resetGame(SDL_Renderer* renderer);
+	void createTryAgainButton(SDL_Renderer* renderer);
 
 	int mouseDownStatus = 0;
 
@@ -75,4 +84,5 @@ private:
 	Mix_Chunk* mix_ChunkSpawnUnit = nullptr;
 
 	TTF_Font* font = nullptr;
+	std::string currentBackground;
 };

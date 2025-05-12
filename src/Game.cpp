@@ -6,7 +6,8 @@ Game::Game(SDL_Window* window, SDL_Renderer* renderer, int windowWidth, int wind
     placementModeCurrent(PlacementMode::wall), 
     level(renderer, windowWidth / tileSize, windowHeight / tileSize, backgroundFile),
     spawnTimer(0.25f), roundTimer(5.0f),
-    windowWidth(windowWidth), windowHeight(windowHeight) {
+    windowWidth(windowWidth), windowHeight(windowHeight),
+    currentBackground(backgroundFile) {
 
     //Load the font
     font = TTF_OpenFont("D:/Xius/Dev/Game_Project/Data/Fonts/arial.ttf", 24);
@@ -25,6 +26,9 @@ Game::Game(SDL_Window* window, SDL_Renderer* renderer, int windowWidth, int wind
         textureOverlay = TextureLoader::loadTexture(renderer, "Overlay.bmp");
         textureWin = TextureLoader::loadTexture(renderer, "YouWin.bmp");
         textureGameOver = TextureLoader::loadTexture(renderer, "GameOver.bmp");
+
+        // Create Try Again button
+        createTryAgainButton(renderer);
 
         //Load the spawn unit sound.
         mix_ChunkSpawnUnit = SoundLoader::loadSound("Spawn Unit.ogg");
@@ -83,13 +87,39 @@ void Game::processEvents(SDL_Renderer* renderer, bool& running) {
 
         case SDL_MOUSEBUTTONDOWN:
             mouseDownThisFrame = (mouseDownStatus == 0);
-            if (event.button.button == SDL_BUTTON_LEFT)
+            if (event.button.button == SDL_BUTTON_LEFT) {
                 mouseDownStatus = SDL_BUTTON_LEFT;
+                
+                // Check if Try Again button was clicked
+                if (gameState != GameState::playing) {
+                    int mouseX, mouseY;
+                    SDL_GetMouseState(&mouseX, &mouseY);
+                    if (mouseX >= tryAgainButton.rect.x && 
+                        mouseX <= tryAgainButton.rect.x + tryAgainButton.rect.w &&
+                        mouseY >= tryAgainButton.rect.y && 
+                        mouseY <= tryAgainButton.rect.y + tryAgainButton.rect.h) {
+                        resetGame(renderer);
+                    }
+                }
+            }
             else if (event.button.button == SDL_BUTTON_RIGHT)
                 mouseDownStatus = SDL_BUTTON_RIGHT;
             break;
+
         case SDL_MOUSEBUTTONUP:
             mouseDownStatus = 0;
+            break;
+
+        case SDL_MOUSEMOTION:
+            // Update button hover state
+            if (gameState != GameState::playing) {
+                int mouseX = event.motion.x;
+                int mouseY = event.motion.y;
+                tryAgainButton.hover = (mouseX >= tryAgainButton.rect.x && 
+                                      mouseX <= tryAgainButton.rect.x + tryAgainButton.rect.w &&
+                                      mouseY >= tryAgainButton.rect.y && 
+                                      mouseY <= tryAgainButton.rect.y + tryAgainButton.rect.h);
+            }
             break;
 
         case SDL_KEYDOWN:
@@ -314,6 +344,22 @@ void Game::draw(SDL_Renderer* renderer) {
             
             SDL_RenderCopy(renderer, endScreenTexture, NULL, &rect);
         }
+
+        // Draw Try Again button
+        if (tryAgainButton.texture != nullptr) {
+            // Draw button background
+            SDL_SetRenderDrawColor(renderer, tryAgainButton.hover ? 100 : 50, 50, 50, 255);
+            SDL_Rect bgRect = {
+                tryAgainButton.rect.x - 20,
+                tryAgainButton.rect.y - 10,
+                tryAgainButton.rect.w + 40,
+                tryAgainButton.rect.h + 20
+            };
+            SDL_RenderFillRect(renderer, &bgRect);
+            
+            // Draw button text
+            SDL_RenderCopy(renderer, tryAgainButton.texture, NULL, &tryAgainButton.rect);
+        }
     }
 
     //Send the image to the window.
@@ -426,4 +472,45 @@ void Game::drawPlacementPreview(SDL_Renderer* renderer, Vector2D mousePos) {
     } else if (placementModeCurrent == PlacementMode::turret) {
         SDL_RenderDrawRect(renderer, &previewRect);
     }
+}
+
+void Game::createTryAgainButton(SDL_Renderer* renderer) {
+    if (font == nullptr) return;
+
+    SDL_Color textColor = {255, 255, 255, 255};
+    SDL_Surface* surface = TTF_RenderText_Solid(font, "Try Again", textColor);
+    if (surface != nullptr) {
+        tryAgainButton.texture = SDL_CreateTextureFromSurface(renderer, surface);
+        
+        // Position button at bottom center of screen
+        tryAgainButton.rect = {
+            (windowWidth - surface->w) / 2,
+            windowHeight - surface->h - 50,
+            surface->w,
+            surface->h
+        };
+        
+        SDL_FreeSurface(surface);
+    }
+}
+
+void Game::resetGame(SDL_Renderer* renderer) {
+    // Reset game state
+    gameState = GameState::playing;
+    cityHealth = maxCityHealth;
+    currentRound = 0;
+    spawnUnitCount = 0;
+    
+    // Clear all game objects
+    listUnits.clear();
+    listTurrets.clear();
+    listProjectiles.clear();
+    
+    // Reset timers
+    spawnTimer.resetToMax();
+    roundTimer.resetToMax();
+    
+    // Reset level by clearing walls and reloading background
+    level.clearWalls();
+    level.loadBackground(renderer, currentBackground);
 }
