@@ -28,7 +28,8 @@ private:
 
 
 public:
-	Level(SDL_Renderer* renderer, int setTileCountX, int setTileCountY);
+	// Modified constructor to accept background filename
+	Level(SDL_Renderer* renderer, int setTileCountX, int setTileCountY, const std::string& backgroundFile = "bg1.bmp");
 	void draw(SDL_Renderer* renderer, int tileSize);
 
 	Vector2D getRandomEnemySpawnerLocation();
@@ -52,6 +53,7 @@ private:
 
 	const int targetX = 0, targetY = 0;
 
+	SDL_Texture* textureBackground = nullptr;
 	SDL_Texture* textureTileWall = nullptr,
 		*textureTileTarget = nullptr,
 		*textureTileEnemySpawner = nullptr,

@@ -2,15 +2,29 @@
 
 
 
-Game::Game(SDL_Window* window, SDL_Renderer* renderer, int windowWidth, int windowHeight) :
+Game::Game(SDL_Window* window, SDL_Renderer* renderer, int windowWidth, int windowHeight, const std::string& backgroundFile) :
     placementModeCurrent(PlacementMode::wall), 
-    level(renderer, windowWidth / tileSize, windowHeight / tileSize),
-    spawnTimer(0.25f), roundTimer(5.0f) {
+    level(renderer, windowWidth / tileSize, windowHeight / tileSize, backgroundFile),
+    spawnTimer(0.25f), roundTimer(5.0f),
+    windowWidth(windowWidth), windowHeight(windowHeight) {
+
+    //Load the font
+    font = TTF_OpenFont("D:/Xius/Dev/Game_Project/Data/Fonts/arial.ttf", 24);
+    if (font == nullptr) {
+        std::cout << "Error: Couldn't load font = " << TTF_GetError() << std::endl;
+        // Try loading a fallback font
+        font = TTF_OpenFont("D:/Xius/Dev/Game_Project/Data/Fonts/arial.ttf", 24);
+        if (font == nullptr) {
+            std::cout << "Error: Couldn't load fallback font = " << TTF_GetError() << std::endl;
+        }
+    }
 
     //Run the game.
     if (window != nullptr && renderer != nullptr) {
         //Load the overlay texture.
         textureOverlay = TextureLoader::loadTexture(renderer, "Overlay.bmp");
+        textureWin = TextureLoader::loadTexture(renderer, "YouWin.bmp");
+        textureGameOver = TextureLoader::loadTexture(renderer, "GameOver.bmp");
 
         //Load the spawn unit sound.
         mix_ChunkSpawnUnit = SoundLoader::loadSound("Spawn Unit.ogg");
@@ -44,9 +58,12 @@ Game::Game(SDL_Window* window, SDL_Renderer* renderer, int windowWidth, int wind
     }
 }
 
-
 Game::~Game() {
     //Clean up.
+    if (font != nullptr) {
+        TTF_CloseFont(font);
+        font = nullptr;
+    }
     TextureLoader::deallocateTextures();
     SoundLoader::deallocateSounds();
 }
@@ -135,17 +152,25 @@ void Game::processEvents(SDL_Renderer* renderer, bool& running) {
 
 
 void Game::update(SDL_Renderer* renderer, float dT) {
-    //Update the units.
-    updateUnits(dT);
+    // Only update game if still playing
+    if (gameState == GameState::playing) {
+        //Update the units.
+        updateUnits(dT);
 
-    //Update the turrets.
-    for (auto& turretSelected : listTurrets)
-        turretSelected.update(renderer, dT, listUnits, listProjectiles);
+        //Update the turrets.
+        for (auto& turretSelected : listTurrets)
+            turretSelected.update(renderer, dT, listUnits, listProjectiles);
 
-    //Update the projectiles.
-    updateProjectiles(dT);
+        //Update the projectiles.
+        updateProjectiles(dT);
 
-    updateSpawnUnitsIfRequired(renderer, dT);
+        updateSpawnUnitsIfRequired(renderer, dT);
+
+        // Check win condition
+        if (currentRound >= maxRounds && listUnits.empty()) {
+            gameState = GameState::victory;
+        }
+    }
 }
 
 
@@ -158,7 +183,15 @@ void Game::updateUnits(float dT) {
         if ((*it) != nullptr) {
             (*it)->update(dT, level, listUnits);
 
-            //Check if the unit is still alive.  If not then erase it and don't increment the iterator.
+            // If unit reached target, reduce city health
+            if ((*it)->reachedTarget()) {
+                cityHealth -= 5; // Each enemy that reaches target reduces health by 5
+                if (cityHealth <= 0) {
+                    gameState = GameState::gameOver;
+                }
+            }
+
+            //Check if the unit is still alive. If not then erase it and don't increment the iterator.
             if ((*it)->isAlive() == false) {
                 it = listUnits.erase(it);
                 increment = false;
@@ -193,7 +226,8 @@ void Game::updateSpawnUnitsIfRequired(SDL_Renderer* renderer, float dT) {
     if (listUnits.empty() && spawnUnitCount == 0) {
         roundTimer.countDown(dT);
         if (roundTimer.timeSIsZero()) {
-            spawnUnitCount = 15;
+            currentRound++;
+            spawnUnitCount = 15 + (currentRound * 5); // Increase enemies per round
             roundTimer.resetToMax();
         }
     }
@@ -207,7 +241,6 @@ void Game::updateSpawnUnitsIfRequired(SDL_Renderer* renderer, float dT) {
             Mix_PlayChannel(-1, mix_ChunkSpawnUnit, 0);
 
         spawnUnitCount--;
-        spawnTimer.resetToMax();
     }
 }
 
@@ -238,12 +271,49 @@ void Game::draw(SDL_Renderer* renderer) {
     for (auto& projectileSelected : listProjectiles)
         projectileSelected.draw(renderer, tileSize);
     
+    // Draw placement preview
+    int mouseX = 0, mouseY = 0;
+    SDL_GetMouseState(&mouseX, &mouseY);
+    Vector2D mousePos((float)mouseX / tileSize, (float)mouseY / tileSize);
+    drawPlacementPreview(renderer, mousePos);
+
     //Draw the overlay.
     if (textureOverlay != nullptr && overlayVisible) {
         int w = 0, h = 0;
         SDL_QueryTexture(textureOverlay, NULL, NULL, &w, &h);
         SDL_Rect rect = { 40, 40, w, h };
         SDL_RenderCopy(renderer, textureOverlay, NULL, &rect);
+    }
+
+    // Draw game state information
+    drawGameState(renderer);
+
+    // Draw win/lose screen
+    if (gameState != GameState::playing) {
+        SDL_Texture* endScreenTexture = (gameState == GameState::victory) ? textureWin : textureGameOver;
+        if (endScreenTexture != nullptr) {
+            int w = 0, h = 0;
+            SDL_QueryTexture(endScreenTexture, NULL, NULL, &w, &h);
+            
+            // Calculate scaling to fit the screen while maintaining aspect ratio
+            float scale = std::min(
+                (float)windowWidth / w,
+                (float)windowHeight / h
+            );
+            
+            int scaledW = (int)(w * scale);
+            int scaledH = (int)(h * scale);
+            
+            // Center the image on screen
+            SDL_Rect rect = {
+                (windowWidth - scaledW) / 2,
+                (windowHeight - scaledH) / 2,
+                scaledW,
+                scaledH
+            };
+            
+            SDL_RenderCopy(renderer, endScreenTexture, NULL, &rect);
+        }
     }
 
     //Send the image to the window.
@@ -253,7 +323,7 @@ void Game::draw(SDL_Renderer* renderer) {
 
 
 void Game::addUnit(SDL_Renderer* renderer, Vector2D posMouse) {
-    listUnits.push_back(std::make_shared<Unit>(renderer, posMouse));
+    listUnits.push_back(std::make_shared<Unit>(renderer, posMouse, currentRound));
 }
 
 
@@ -270,5 +340,90 @@ void Game::removeTurretsAtMousePosition(Vector2D posMouse) {
             it = listTurrets.erase(it);
         else
             it++;
+    }
+}
+
+void Game::drawGameState(SDL_Renderer* renderer) {
+    if (font == nullptr) return; // Skip text rendering if font failed to load
+
+    // Set up text rendering
+    SDL_Color textColor = { 0, 0, 0, 255 };
+    char buffer[128];
+
+    // Draw city health
+    sprintf_s(buffer, "City Health: %d/%d", cityHealth, maxCityHealth);
+    SDL_Surface* surface = TTF_RenderText_Solid(font, buffer, textColor);
+    if (surface != nullptr) {
+        SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surface);
+        if (texture != nullptr) {
+            SDL_Rect rect = { 20, 20, surface->w, surface->h };
+            SDL_RenderCopy(renderer, texture, NULL, &rect);
+            SDL_DestroyTexture(texture);
+        }
+        SDL_FreeSurface(surface);
+    }
+
+    // Draw round information
+    sprintf_s(buffer, "Round: %d/%d", currentRound, maxRounds);
+    surface = TTF_RenderText_Solid(font, buffer, textColor);
+    if (surface != nullptr) {
+        SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surface);
+        if (texture != nullptr) {
+            SDL_Rect rect = { 20, 50, surface->w, surface->h };
+            SDL_RenderCopy(renderer, texture, NULL, &rect);
+            SDL_DestroyTexture(texture);
+        }
+        SDL_FreeSurface(surface);
+    }
+
+    // Draw remaining enemies
+    sprintf_s(buffer, "Enemies Remaining: %d", spawnUnitCount + listUnits.size());
+    surface = TTF_RenderText_Solid(font, buffer, textColor);
+    if (surface != nullptr) {
+        SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surface);
+        if (texture != nullptr) {
+            SDL_Rect rect = { 20, 80, surface->w, surface->h };
+            SDL_RenderCopy(renderer, texture, NULL, &rect);
+            SDL_DestroyTexture(texture);
+        }
+        SDL_FreeSurface(surface);
+    }
+
+    // Draw game over or victory message
+    // if (gameState != GameState::playing) {
+    //     const char* message = (gameState == GameState::gameOver) ? "Game Over!" : "Victory!";
+    //     surface = TTF_RenderText_Solid(font, message, textColor);
+    //     if (surface != nullptr) {
+    //         SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surface);
+    //         if (texture != nullptr) {
+    //             SDL_Rect rect = { 400, 288, surface->w, surface->h };
+    //             SDL_RenderCopy(renderer, texture, NULL, &rect);
+    //             SDL_DestroyTexture(texture);
+    //         }
+    //         SDL_FreeSurface(surface);
+    //     }
+    // }
+}
+
+void Game::drawPlacementPreview(SDL_Renderer* renderer, Vector2D mousePos) {
+    if (gameState != GameState::playing) return;
+
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+    SDL_SetRenderDrawColor(renderer, 0, 255, 0, 128);
+
+    int tileX = (int)mousePos.x;
+    int tileY = (int)mousePos.y;
+
+    SDL_Rect previewRect = {
+        tileX * tileSize,
+        tileY * tileSize,
+        tileSize,
+        tileSize
+    };
+
+    if (placementModeCurrent == PlacementMode::wall) {
+        SDL_RenderFillRect(renderer, &previewRect);
+    } else if (placementModeCurrent == PlacementMode::turret) {
+        SDL_RenderDrawRect(renderer, &previewRect);
     }
 }

@@ -2,11 +2,62 @@
 
 
 
-Level::Level(SDL_Renderer* renderer, int setTileCountX, int setTileCountY) :
+Level::Level(SDL_Renderer* renderer, int setTileCountX, int setTileCountY, const std::string& backgroundFile) :
     tileCountX(setTileCountX), tileCountY(setTileCountY),
     targetX(setTileCountX / 2), targetY(setTileCountY / 2) {
+    // Try to load background texture with the specified file
+    
+    // First try with the provided filename
+    textureBackground = TextureLoader::loadTexture(renderer, backgroundFile.c_str());
+    
+    // If that fails, try alternate extensions
+    if (textureBackground == nullptr) {
+        // Try changing extension to .bmp if it's not already
+        std::string altFile = backgroundFile;
+        if (altFile.length() > 4) {
+            std::string ext = altFile.substr(altFile.length() - 4);
+            if (ext == ".bmg") {
+                altFile = altFile.substr(0, altFile.length() - 4) + ".bmp";
+            } else if (ext == ".bmp") {
+                altFile = altFile.substr(0, altFile.length() - 4) + ".bmg";
+            }
+            textureBackground = TextureLoader::loadTexture(renderer, altFile.c_str());
+        }
+    }
+    
+    // If TextureLoader fails, try direct SDL loading
+    if (textureBackground == nullptr) {
+        SDL_Log("Failed to load background texture with TextureLoader, trying direct SDL loading");
+        
+        // Try with different paths and extensions
+        SDL_Surface* surface = SDL_LoadBMP(backgroundFile.c_str());
+        if (surface == nullptr) {
+            // Try with alternate extension
+            std::string altFile = backgroundFile;
+            if (altFile.length() > 4) {
+                std::string ext = altFile.substr(altFile.length() - 4);
+                if (ext == ".bmg") {
+                    altFile = altFile.substr(0, altFile.length() - 4) + ".bmp";
+                } else if (ext == ".bmp") {
+                    altFile = altFile.substr(0, altFile.length() - 4) + ".bmg";
+                }
+                surface = SDL_LoadBMP(altFile.c_str());
+            }
+        }
+        if (surface == nullptr) {
+            surface = SDL_LoadBMP(("./"+backgroundFile).c_str());
+        }
+        
+        if (surface != nullptr) {
+            textureBackground = SDL_CreateTextureFromSurface(renderer, surface);
+            SDL_FreeSurface(surface);
+        } else {
+            SDL_Log("All attempts to load background failed: %s", SDL_GetError());
+        }
+    }
+    
     textureTileWall = TextureLoader::loadTexture(renderer, "Tile Wall.bmp");
-    textureTileTarget = TextureLoader::loadTexture(renderer, "Tile Target.bmp");
+    textureTileTarget = TextureLoader::loadTexture(renderer, "City.bmp");
     textureTileEnemySpawner = TextureLoader::loadTexture(renderer, "Tile Enemy Spawner.bmp");
 
     textureTileEmpty = TextureLoader::loadTexture(renderer, "Tile Empty.bmp");
@@ -34,18 +85,41 @@ Level::Level(SDL_Renderer* renderer, int setTileCountX, int setTileCountY) :
 }
 
 
-
 void Level::draw(SDL_Renderer* renderer, int tileSize) {
-    //Draw the tile's background color.
-    for (int y = 0; y < tileCountY; y++) {
-        for (int x = 0; x < tileCountX; x++) {
-            if ((x + y) % 2 == 0)
-                SDL_SetRenderDrawColor(renderer, 240, 240, 240, 255);
-            else
-                SDL_SetRenderDrawColor(renderer, 225, 225, 225, 255);
+    // Clear the renderer first
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+    SDL_RenderClear(renderer);
+    
+    // Calculate level dimensions
+    int levelWidth = tileCountX * tileSize;
+    int levelHeight = tileCountY * tileSize;
+    
+    // Draw background if available
+    bool backgroundDrawn = false;
+    if (textureBackground != nullptr) {
+        // Create a rect covering the entire level area
+        SDL_Rect bgRect = { 0, 0, levelWidth, levelHeight };
+        
+        // Draw the background texture
+        if (SDL_RenderCopy(renderer, textureBackground, NULL, &bgRect) == 0) {
+            backgroundDrawn = true;
+        } else {
+            SDL_Log("Failed to render background texture: %s", SDL_GetError());
+        }
+    }
+    
+    // Draw the checkerboard background only if no background image was drawn
+    if (!backgroundDrawn) {
+        for (int y = 0; y < tileCountY; y++) {
+            for (int x = 0; x < tileCountX; x++) {
+                if ((x + y) % 2 == 0)
+                    SDL_SetRenderDrawColor(renderer, 240, 240, 240, 255);
+                else
+                    SDL_SetRenderDrawColor(renderer, 225, 225, 225, 255);
 
-            SDL_Rect rect = { x * tileSize, y * tileSize, tileSize, tileSize };
-            SDL_RenderFillRect(renderer, &rect);
+                SDL_Rect rect = { x * tileSize, y * tileSize, tileSize, tileSize };
+                SDL_RenderFillRect(renderer, &rect);
+            }
         }
     }
 

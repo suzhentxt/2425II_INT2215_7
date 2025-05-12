@@ -2,16 +2,18 @@
 #include "Game.h"
 
 
-const float Unit::speed = 1.5f;
+const float Unit::baseSpeed = 0.5f;
 const float Unit::size = 0.48f;
 
 
 
 
-Unit::Unit(SDL_Renderer* renderer, Vector2D setPos) :
+Unit::Unit(SDL_Renderer* renderer, Vector2D setPos, int roundNumber) :
 	pos(setPos), timerJustHurt(0.25f) {
 	texture = TextureLoader::loadTexture(renderer, "Unit.bmp");
-
+	
+	// Increase speed by 20% each round
+	currentSpeed = baseSpeed * (1.0f + (roundNumber * 0.5f));
 }
 
 
@@ -24,10 +26,11 @@ void Unit::update(float dT, Level& level, std::vector<std::shared_ptr<Unit>>& li
 
 	if (distanceToTarget < 0.5f) {
 		healthCurrent = 0;
+		hasReachedTarget = true;
 	}
 	else {
 		//Determine the distance to move this frame.
-		float distanceMove = speed * dT;
+		float distanceMove = currentSpeed * dT;
 		if (distanceMove > distanceToTarget)
 			distanceMove = distanceToTarget;
 

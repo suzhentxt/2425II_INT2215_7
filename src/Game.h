@@ -2,7 +2,10 @@
 #include <vector>
 #include <chrono>
 #include <memory>
+#include <iostream>
+#include <string>
 #include "SDL2/SDL.h"
+#include "SDL2/SDL_ttf.h"
 #include "Unit.h"
 #include "Turret.h"
 #include "Projectile.h"
@@ -19,9 +22,15 @@ private:
 		turret
 	} placementModeCurrent;
 
+	enum class GameState {
+		playing,
+		gameOver,
+		victory
+	} gameState = GameState::playing;
 
 public:
-	Game(SDL_Window* window, SDL_Renderer* renderer, int windowWidth, int windowHeight);
+	// Modified constructor to accept background file name
+	Game(SDL_Window* window, SDL_Renderer* renderer, int windowWidth, int windowHeight, const std::string& backgroundFile = "bg1.bmp");
 	~Game();
 
 
@@ -35,11 +44,16 @@ private:
 	void addUnit(SDL_Renderer* renderer, Vector2D posMouse);
 	void addTurret(SDL_Renderer* renderer, Vector2D posMouse);
 	void removeTurretsAtMousePosition(Vector2D posMouse);
+	void drawGameState(SDL_Renderer* renderer);
+	void drawPlacementPreview(SDL_Renderer* renderer, Vector2D mousePos);
 
 	int mouseDownStatus = 0;
 
 	const int tileSize = 64;
 	Level level;
+
+	int windowWidth = 0;
+	int windowHeight = 0;
 
 	std::vector<std::shared_ptr<Unit>> listUnits;
 	std::vector<Turret> listTurrets;
@@ -48,8 +62,17 @@ private:
 	SDL_Texture* textureOverlay = nullptr;
 	bool overlayVisible = true;
 
+	SDL_Texture* textureWin = nullptr;
+	SDL_Texture* textureGameOver = nullptr;
+
 	Timer spawnTimer, roundTimer;
 	int spawnUnitCount = 0;
+	int currentRound = 0;
+	const int maxRounds = 5;
+	const int maxCityHealth = 100;
+	int cityHealth = maxCityHealth;
 
 	Mix_Chunk* mix_ChunkSpawnUnit = nullptr;
+
+	TTF_Font* font = nullptr;
 };
