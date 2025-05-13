@@ -39,6 +39,16 @@ private:
 	// Start Game button
 	struct Button startButton;
 
+	// Resource limits
+	int baseTurretsPerRound = 5;
+	int baseWallsPerRound = 10;
+	int turretIncreasePerRound = 1;
+	int wallIncreasePerRound = 5;
+	int maxTurretsPerRound;
+	int maxWallsPerRound;
+	int remainingTurrets;
+	int remainingWalls;
+
 public:
 	// Modified constructor to accept background file name
 	Game(SDL_Window* window, SDL_Renderer* renderer, int windowWidth, int windowHeight, const std::string& backgroundFile = "bg1.bmp");
@@ -93,8 +103,8 @@ private:
 	// Notification system
 	struct Notification {
 		std::string message;
-		float displayTime = 3.0f;  // How long to show the notification
-		float currentTime = 0.0f;  // Current time remaining
+		float displayTime = 4.0f;
+		float currentTime = 0.0f;
 		bool active = false;
 	} notification;
 

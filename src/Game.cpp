@@ -5,9 +5,15 @@
 Game::Game(SDL_Window* window, SDL_Renderer* renderer, int windowWidth, int windowHeight, const std::string& backgroundFile) :
     placementModeCurrent(PlacementMode::wall), 
     level(renderer, windowWidth / tileSize, windowHeight / tileSize, backgroundFile),
-    spawnTimer(0.25f), roundTimer(5.0f),
+    spawnTimer(0.25f), roundTimer(2.25f),
     windowWidth(windowWidth), windowHeight(windowHeight),
     currentBackground(backgroundFile) {
+
+    // Initialize resource limits
+    maxTurretsPerRound = baseTurretsPerRound;
+    maxWallsPerRound = baseWallsPerRound;
+    remainingTurrets = maxTurretsPerRound;
+    remainingWalls = maxWallsPerRound;
 
     //Load the font
     font = TTF_OpenFont("D:/Xius/Dev/Game_Project/Data/Fonts/arial.ttf", 24);
@@ -185,12 +191,43 @@ void Game::processEvents(SDL_Renderer* renderer, bool& running) {
     Vector2D posMouse((float)mouseX / tileSize, (float)mouseY / tileSize);
 
     if (mouseDownStatus > 0 && gameState == GameState::playing) {  // Only process placement in playing state
+        // Calculate center position and tile coordinates
+        int centerX = windowWidth / (2 * tileSize);
+        int centerY = windowHeight / (2 * tileSize);
+        int tileX = (int)posMouse.x;
+        int tileY = (int)posMouse.y;
+        bool isAdjacentToCenter = (abs(tileX - centerX) <= 1 && abs(tileY - centerY) <= 1);
+        int wallsAroundCenter = 0;
+
         switch (mouseDownStatus) {
         case SDL_BUTTON_LEFT:
             switch (placementModeCurrent) {
             case PlacementMode::wall:
+                if (remainingWalls <= 0) {
+                    showNotification("No walls remaining!");
+                    break;
+                }
+                
+                // Count existing walls around center
+                for (int x = centerX - 1; x <= centerX + 1; x++) {
+                    for (int y = centerY - 1; y <= centerY + 1; y++) {
+                        if (level.isTileWall(x, y)) {
+                            wallsAroundCenter++;
+                        }
+                    }
+                }
+                
+                // Don't allow placement if it would create a complete barrier
+                if (isAdjacentToCenter && wallsAroundCenter >= 7) {
+                    showNotification("Cannot block access to city!");
+                    break;
+                }
+                
                 //Add wall at the mouse position.
-                level.setTileWall((int)posMouse.x, (int)posMouse.y, true);
+                if (!level.isTileWall(tileX, tileY)) {
+                    level.setTileWall(tileX, tileY, true);
+                    remainingWalls--;
+                }
                 break;
             case PlacementMode::turret:
                 //Add the selected turret at the mouse position.
@@ -202,7 +239,10 @@ void Game::processEvents(SDL_Renderer* renderer, bool& running) {
 
         case SDL_BUTTON_RIGHT:
             //Remove wall at the mouse position.
-            level.setTileWall((int)posMouse.x, (int)posMouse.y, false);
+            if (level.isTileWall(tileX, tileY)) {
+                level.setTileWall(tileX, tileY, false);
+                remainingWalls++;
+            }
             //Remove turrets at the mouse position.
             removeTurretsAtMousePosition(posMouse);
             break;
@@ -302,9 +342,16 @@ void Game::updateSpawnUnitsIfRequired(SDL_Renderer* renderer, float dT) {
             level.clearWalls();
             level.loadBackground(renderer, currentBackground);
             
-            // Show round notification
+            // Update resource limits for new round
+            maxTurretsPerRound = baseTurretsPerRound + (currentRound - 1) * turretIncreasePerRound;
+            maxWallsPerRound = baseWallsPerRound + (currentRound - 1) * wallIncreasePerRound;
+            remainingTurrets = maxTurretsPerRound;
+            remainingWalls = maxWallsPerRound;
+            
+            // Show round notification with new limits
             char buffer[128];
-            sprintf_s(buffer, "Round %d Starting!", currentRound);
+            sprintf_s(buffer, "Round %d Starting! (Turrets: %d, Walls: %d)", 
+                     currentRound, maxTurretsPerRound, maxWallsPerRound);
             showNotification(buffer);
             
             spawnUnitCount = 15 + (currentRound * 5); // Increase enemies per round
@@ -496,8 +543,14 @@ void Game::addUnit(SDL_Renderer* renderer, Vector2D posMouse) {
 
 
 void Game::addTurret(SDL_Renderer* renderer, Vector2D posMouse) {
+    if (remainingTurrets <= 0) {
+        showNotification("No turrets remaining!");
+        return;
+    }
+    
     Vector2D pos((int)posMouse.x + 0.5f, (int)posMouse.y + 0.5f);
     listTurrets.push_back(Turret(renderer, pos));
+    remainingTurrets--;
 }
 
 
@@ -514,8 +567,14 @@ void Game::drawGameState(SDL_Renderer* renderer) {
     if (font == nullptr) return; // Skip text rendering if font failed to load
 
     // Set up text rendering
-    SDL_Color textColor = { 0, 0, 0, 255 };
+    SDL_Color textColor = { 255, 255, 255, 255 };  // Changed to white text
     char buffer[128];
+
+    // Draw semi-transparent background for all game info
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 180);  // Semi-transparent black
+    SDL_Rect bgRect = { 10, 10, 300, 170 };  // Increased height to properly contain all text
+    SDL_RenderFillRect(renderer, &bgRect);
 
     // Draw city health
     sprintf_s(buffer, "City Health: %d/%d", cityHealth, maxCityHealth);
@@ -556,20 +615,31 @@ void Game::drawGameState(SDL_Renderer* renderer) {
         SDL_FreeSurface(surface);
     }
 
-    // Draw game over or victory message
-    // if (gameState != GameState::playing) {
-    //     const char* message = (gameState == GameState::gameOver) ? "Game Over!" : "Victory!";
-    //     surface = TTF_RenderText_Solid(font, message, textColor);
-    //     if (surface != nullptr) {
-    //         SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surface);
-    //         if (texture != nullptr) {
-    //             SDL_Rect rect = { 400, 288, surface->w, surface->h };
-    //             SDL_RenderCopy(renderer, texture, NULL, &rect);
-    //             SDL_DestroyTexture(texture);
-    //         }
-    //         SDL_FreeSurface(surface);
-    //     }
-    // }
+    // Draw remaining turrets
+    sprintf_s(buffer, "Turrets: %d/%d", remainingTurrets, maxTurretsPerRound);
+    surface = TTF_RenderText_Solid(font, buffer, textColor);
+    if (surface != nullptr) {
+        SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surface);
+        if (texture != nullptr) {
+            SDL_Rect rect = { 20, 110, surface->w, surface->h };
+            SDL_RenderCopy(renderer, texture, NULL, &rect);
+            SDL_DestroyTexture(texture);
+        }
+        SDL_FreeSurface(surface);
+    }
+
+    // Draw remaining walls
+    sprintf_s(buffer, "Walls: %d/%d", remainingWalls, maxWallsPerRound);
+    surface = TTF_RenderText_Solid(font, buffer, textColor);
+    if (surface != nullptr) {
+        SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surface);
+        if (texture != nullptr) {
+            SDL_Rect rect = { 20, 140, surface->w, surface->h };
+            SDL_RenderCopy(renderer, texture, NULL, &rect);
+            SDL_DestroyTexture(texture);
+        }
+        SDL_FreeSurface(surface);
+    }
 }
 
 void Game::drawPlacementPreview(SDL_Renderer* renderer, Vector2D mousePos) {
@@ -641,6 +711,12 @@ void Game::resetGame(SDL_Renderer* renderer) {
     cityHealth = maxCityHealth;
     currentRound = 0;
     spawnUnitCount = 0;
+    
+    // Reset resource limits to base values
+    maxTurretsPerRound = baseTurretsPerRound;
+    maxWallsPerRound = baseWallsPerRound;
+    remainingTurrets = maxTurretsPerRound;
+    remainingWalls = maxWallsPerRound;
     
     // Clear all game objects
     listUnits.clear();

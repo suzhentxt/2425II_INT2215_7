@@ -48,7 +48,7 @@ BackgroundSelection::BackgroundSelection(SDL_Renderer* renderer, int width, int 
     
     // Create background options
     std::vector<std::string> filenames = {"bg1.bmp", "bg2.bmp", "bg3.bmp"};
-    std::vector<std::string> displayNames = {"Grassy Field", "Desert", "Light Desert"};
+    std::vector<std::string> displayNames = {"Grassy Field", "Light Desert", "Desert"};
     
     // Create smaller font for labels
     TTF_Font* labelFont = nullptr;
