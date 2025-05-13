@@ -5,7 +5,7 @@
 Game::Game(SDL_Window* window, SDL_Renderer* renderer, int windowWidth, int windowHeight, const std::string& backgroundFile) :
     placementModeCurrent(PlacementMode::wall), 
     level(renderer, windowWidth / tileSize, windowHeight / tileSize, backgroundFile),
-    spawnTimer(0.25f), roundTimer(2.25f),
+    spawnTimer(0.25f), roundTimer(3.0f),
     windowWidth(windowWidth), windowHeight(windowHeight),
     currentBackground(backgroundFile) {
 
