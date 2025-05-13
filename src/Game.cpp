@@ -23,12 +23,15 @@ Game::Game(SDL_Window* window, SDL_Renderer* renderer, int windowWidth, int wind
     //Run the game.
     if (window != nullptr && renderer != nullptr) {
         //Load the overlay texture.
-        textureOverlay = TextureLoader::loadTexture(renderer, "Overlay.bmp");
+        // textureOverlay = TextureLoader::loadTexture(renderer, "Overlay.bmp");
         textureWin = TextureLoader::loadTexture(renderer, "YouWin.bmp");
         textureGameOver = TextureLoader::loadTexture(renderer, "GameOver.bmp");
+        textureInstructions = TextureLoader::loadTexture(renderer, "Instructions.bmp");
 
         // Create Try Again button
         createTryAgainButton(renderer);
+        // Create Start Game button
+        createStartButton(renderer);
 
         //Load the spawn unit sound.
         mix_ChunkSpawnUnit = SoundLoader::loadSound("Spawn Unit.ogg");
@@ -94,11 +97,28 @@ void Game::processEvents(SDL_Renderer* renderer, bool& running) {
                 if (gameState != GameState::playing) {
                     int mouseX, mouseY;
                     SDL_GetMouseState(&mouseX, &mouseY);
-                    if (mouseX >= tryAgainButton.rect.x && 
-                        mouseX <= tryAgainButton.rect.x + tryAgainButton.rect.w &&
-                        mouseY >= tryAgainButton.rect.y && 
-                        mouseY <= tryAgainButton.rect.y + tryAgainButton.rect.h) {
-                        resetGame(renderer);
+                    
+                    if (gameState == GameState::instructions) {
+                        // Check Start Game button
+                        if (mouseX >= startButton.rect.x && 
+                            mouseX <= startButton.rect.x + startButton.rect.w &&
+                            mouseY >= startButton.rect.y && 
+                            mouseY <= startButton.rect.y + startButton.rect.h) {
+                            gameState = GameState::playing;
+                            instructionsVisible = false;  // Hide instructions when starting game
+                            mouseDownStatus = 0;  // Reset mouse status to prevent wall placement
+                            break;  // Skip further processing
+                        }
+                    } else {
+                        // Check Try Again button
+                        if (mouseX >= tryAgainButton.rect.x && 
+                            mouseX <= tryAgainButton.rect.x + tryAgainButton.rect.w &&
+                            mouseY >= tryAgainButton.rect.y && 
+                            mouseY <= tryAgainButton.rect.y + tryAgainButton.rect.h) {
+                            resetGame(renderer);
+                            mouseDownStatus = 0;  // Reset mouse status to prevent wall placement
+                            break;  // Skip further processing
+                        }
                     }
                 }
             }
@@ -111,14 +131,22 @@ void Game::processEvents(SDL_Renderer* renderer, bool& running) {
             break;
 
         case SDL_MOUSEMOTION:
-            // Update button hover state
+            // Update button hover states
             if (gameState != GameState::playing) {
                 int mouseX = event.motion.x;
                 int mouseY = event.motion.y;
-                tryAgainButton.hover = (mouseX >= tryAgainButton.rect.x && 
-                                      mouseX <= tryAgainButton.rect.x + tryAgainButton.rect.w &&
-                                      mouseY >= tryAgainButton.rect.y && 
-                                      mouseY <= tryAgainButton.rect.y + tryAgainButton.rect.h);
+                
+                if (gameState == GameState::instructions) {
+                    startButton.hover = (mouseX >= startButton.rect.x && 
+                                       mouseX <= startButton.rect.x + startButton.rect.w &&
+                                       mouseY >= startButton.rect.y && 
+                                       mouseY <= startButton.rect.y + startButton.rect.h);
+                } else {
+                    tryAgainButton.hover = (mouseX >= tryAgainButton.rect.x && 
+                                          mouseX <= tryAgainButton.rect.x + tryAgainButton.rect.w &&
+                                          mouseY >= tryAgainButton.rect.y && 
+                                          mouseY <= tryAgainButton.rect.y + tryAgainButton.rect.h);
+                }
             }
             break;
 
@@ -141,6 +169,10 @@ void Game::processEvents(SDL_Renderer* renderer, bool& running) {
             case SDL_SCANCODE_H:
                 overlayVisible = !overlayVisible;
                 break;
+                //Show/hide the instructions
+            case SDL_SCANCODE_I:
+                instructionsVisible = !instructionsVisible;
+                break;
             }
         }
     }
@@ -152,7 +184,7 @@ void Game::processEvents(SDL_Renderer* renderer, bool& running) {
     //Convert from the window's coordinate system to the game's coordinate system.
     Vector2D posMouse((float)mouseX / tileSize, (float)mouseY / tileSize);
 
-    if (mouseDownStatus > 0) {
+    if (mouseDownStatus > 0 && gameState == GameState::playing) {  // Only process placement in playing state
         switch (mouseDownStatus) {
         case SDL_BUTTON_LEFT:
             switch (placementModeCurrent) {
@@ -168,7 +200,6 @@ void Game::processEvents(SDL_Renderer* renderer, bool& running) {
             }
             break;
 
-
         case SDL_BUTTON_RIGHT:
             //Remove wall at the mouse position.
             level.setTileWall((int)posMouse.x, (int)posMouse.y, false);
@@ -182,6 +213,14 @@ void Game::processEvents(SDL_Renderer* renderer, bool& running) {
 
 
 void Game::update(SDL_Renderer* renderer, float dT) {
+    // Update notification timer
+    if (notification.active) {
+        notification.currentTime -= dT;
+        if (notification.currentTime <= 0) {
+            notification.active = false;
+        }
+    }
+
     // Only update game if still playing
     if (gameState == GameState::playing) {
         //Update the units.
@@ -257,6 +296,17 @@ void Game::updateSpawnUnitsIfRequired(SDL_Renderer* renderer, float dT) {
         roundTimer.countDown(dT);
         if (roundTimer.timeSIsZero()) {
             currentRound++;
+            
+            // Reset map for new round
+            listTurrets.clear();
+            level.clearWalls();
+            level.loadBackground(renderer, currentBackground);
+            
+            // Show round notification
+            char buffer[128];
+            sprintf_s(buffer, "Round %d Starting!", currentRound);
+            showNotification(buffer);
+            
             spawnUnitCount = 15 + (currentRound * 5); // Increase enemies per round
             roundTimer.resetToMax();
         }
@@ -315,50 +365,121 @@ void Game::draw(SDL_Renderer* renderer) {
         SDL_RenderCopy(renderer, textureOverlay, NULL, &rect);
     }
 
+    // Draw instructions overlay
+    if (textureInstructions != nullptr && instructionsVisible) {
+        int w = 0, h = 0;
+        SDL_QueryTexture(textureInstructions, NULL, NULL, &w, &h);
+        
+        // Calculate scaling to fit the screen while maintaining aspect ratio
+        float scale = std::min(
+            (float)(windowWidth - 80) / w,  // Leave 40px padding on each side
+            (float)(windowHeight - 120) / h  // Leave 40px padding top and 80px bottom for button
+        );
+        
+        int scaledW = (int)(w * scale);
+        int scaledH = (int)(h * scale);
+        
+        // Center the image on screen
+        SDL_Rect rect = {
+            (windowWidth - scaledW) / 2,
+            (windowHeight - scaledH) / 2 - 20,  // Slightly above center to make room for button
+            scaledW,
+            scaledH
+        };
+        
+        SDL_RenderCopy(renderer, textureInstructions, NULL, &rect);
+    }
+
     // Draw game state information
     drawGameState(renderer);
 
+    // Draw notification
+    drawNotification(renderer);
+
     // Draw win/lose screen
     if (gameState != GameState::playing) {
-        SDL_Texture* endScreenTexture = (gameState == GameState::victory) ? textureWin : textureGameOver;
-        if (endScreenTexture != nullptr) {
-            int w = 0, h = 0;
-            SDL_QueryTexture(endScreenTexture, NULL, NULL, &w, &h);
-            
-            // Calculate scaling to fit the screen while maintaining aspect ratio
-            float scale = std::min(
-                (float)windowWidth / w,
-                (float)windowHeight / h
-            );
-            
-            int scaledW = (int)(w * scale);
-            int scaledH = (int)(h * scale);
-            
-            // Center the image on screen
-            SDL_Rect rect = {
-                (windowWidth - scaledW) / 2,
-                (windowHeight - scaledH) / 2,
-                scaledW,
-                scaledH
-            };
-            
-            SDL_RenderCopy(renderer, endScreenTexture, NULL, &rect);
-        }
+        if (gameState == GameState::instructions) {
+            // Draw instructions
+            if (textureInstructions != nullptr) {
+                int w = 0, h = 0;
+                SDL_QueryTexture(textureInstructions, NULL, NULL, &w, &h);
+                
+                // Calculate scaling to fit the screen while maintaining aspect ratio
+                float scale = std::min(
+                    (float)(windowWidth - 80) / w,  // Leave 40px padding on each side
+                    (float)(windowHeight - 120) / h  // Leave 40px padding top and 80px bottom for button
+                );
+                
+                int scaledW = (int)(w * scale);
+                int scaledH = (int)(h * scale);
+                
+                // Center the image on screen
+                SDL_Rect rect = {
+                    (windowWidth - scaledW) / 2,
+                    (windowHeight - scaledH) / 2 - 20,  // Slightly above center to make room for button
+                    scaledW,
+                    scaledH
+                };
+                
+                SDL_RenderCopy(renderer, textureInstructions, NULL, &rect);
+            }
 
-        // Draw Try Again button
-        if (tryAgainButton.texture != nullptr) {
-            // Draw button background
-            SDL_SetRenderDrawColor(renderer, tryAgainButton.hover ? 100 : 50, 50, 50, 255);
-            SDL_Rect bgRect = {
-                tryAgainButton.rect.x - 20,
-                tryAgainButton.rect.y - 10,
-                tryAgainButton.rect.w + 40,
-                tryAgainButton.rect.h + 20
-            };
-            SDL_RenderFillRect(renderer, &bgRect);
-            
-            // Draw button text
-            SDL_RenderCopy(renderer, tryAgainButton.texture, NULL, &tryAgainButton.rect);
+            // Draw Start Game button
+            if (startButton.texture != nullptr) {
+                // Draw button background
+                SDL_SetRenderDrawColor(renderer, startButton.hover ? 100 : 50, 50, 50, 255);
+                SDL_Rect bgRect = {
+                    startButton.rect.x - 20,
+                    startButton.rect.y - 10,
+                    startButton.rect.w + 40,
+                    startButton.rect.h + 20
+                };
+                SDL_RenderFillRect(renderer, &bgRect);
+                
+                // Draw button text
+                SDL_RenderCopy(renderer, startButton.texture, NULL, &startButton.rect);
+            }
+        } else {
+            SDL_Texture* endScreenTexture = (gameState == GameState::victory) ? textureWin : textureGameOver;
+            if (endScreenTexture != nullptr) {
+                int w = 0, h = 0;
+                SDL_QueryTexture(endScreenTexture, NULL, NULL, &w, &h);
+                
+                // Calculate scaling to fit the screen while maintaining aspect ratio
+                float scale = std::min(
+                    (float)windowWidth / w,
+                    (float)windowHeight / h
+                );
+                
+                int scaledW = (int)(w * scale);
+                int scaledH = (int)(h * scale);
+                
+                // Center the image on screen
+                SDL_Rect rect = {
+                    (windowWidth - scaledW) / 2,
+                    (windowHeight - scaledH) / 2,
+                    scaledW,
+                    scaledH
+                };
+                
+                SDL_RenderCopy(renderer, endScreenTexture, NULL, &rect);
+            }
+
+            // Draw Try Again button
+            if (tryAgainButton.texture != nullptr) {
+                // Draw button background
+                SDL_SetRenderDrawColor(renderer, tryAgainButton.hover ? 100 : 50, 50, 50, 255);
+                SDL_Rect bgRect = {
+                    tryAgainButton.rect.x - 20,
+                    tryAgainButton.rect.y - 10,
+                    tryAgainButton.rect.w + 40,
+                    tryAgainButton.rect.h + 20
+                };
+                SDL_RenderFillRect(renderer, &bgRect);
+                
+                // Draw button text
+                SDL_RenderCopy(renderer, tryAgainButton.texture, NULL, &tryAgainButton.rect);
+            }
         }
     }
 
@@ -494,6 +615,26 @@ void Game::createTryAgainButton(SDL_Renderer* renderer) {
     }
 }
 
+void Game::createStartButton(SDL_Renderer* renderer) {
+    if (font == nullptr) return;
+
+    SDL_Color textColor = {255, 255, 255, 255};
+    SDL_Surface* surface = TTF_RenderText_Solid(font, "Start Game", textColor);
+    if (surface != nullptr) {
+        startButton.texture = SDL_CreateTextureFromSurface(renderer, surface);
+        
+        // Position button at bottom center of screen
+        startButton.rect = {
+            (windowWidth - surface->w) / 2,
+            windowHeight - surface->h - 50,
+            surface->w,
+            surface->h
+        };
+        
+        SDL_FreeSurface(surface);
+    }
+}
+
 void Game::resetGame(SDL_Renderer* renderer) {
     // Reset game state
     gameState = GameState::playing;
@@ -513,4 +654,45 @@ void Game::resetGame(SDL_Renderer* renderer) {
     // Reset level by clearing walls and reloading background
     level.clearWalls();
     level.loadBackground(renderer, currentBackground);
+}
+
+void Game::showNotification(const std::string& message) {
+    notification.message = message;
+    notification.currentTime = notification.displayTime;
+    notification.active = true;
+}
+
+void Game::drawNotification(SDL_Renderer* renderer) {
+    if (!notification.active || font == nullptr) return;
+
+    SDL_Color textColor = { 255, 255, 255, 255 };  // White text
+    SDL_Surface* surface = TTF_RenderText_Solid(font, notification.message.c_str(), textColor);
+    if (surface != nullptr) {
+        SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surface);
+        if (texture != nullptr) {
+            // Center the notification on screen
+            SDL_Rect rect = {
+                (windowWidth - surface->w) / 2,
+                windowHeight / 4,  // Position at 1/4 from top
+                surface->w,
+                surface->h
+            };
+            
+            // Draw semi-transparent background
+            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+            SDL_SetRenderDrawColor(renderer, 0, 0, 0, 180);  // Semi-transparent black
+            SDL_Rect bgRect = {
+                rect.x - 20,
+                rect.y - 10,
+                rect.w + 40,
+                rect.h + 20
+            };
+            SDL_RenderFillRect(renderer, &bgRect);
+            
+            // Draw the text
+            SDL_RenderCopy(renderer, texture, NULL, &rect);
+            SDL_DestroyTexture(texture);
+        }
+        SDL_FreeSurface(surface);
+    }
 }

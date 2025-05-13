@@ -23,10 +23,11 @@ private:
 	} placementModeCurrent;
 
 	enum class GameState {
+		instructions,
 		playing,
 		gameOver,
 		victory
-	} gameState = GameState::playing;
+	} gameState = GameState::instructions;
 
 	// Try Again button
 	struct Button {
@@ -34,6 +35,9 @@ private:
 		SDL_Texture* texture = nullptr;
 		bool hover = false;
 	} tryAgainButton;
+
+	// Start Game button
+	struct Button startButton;
 
 public:
 	// Modified constructor to accept background file name
@@ -55,6 +59,9 @@ private:
 	void drawPlacementPreview(SDL_Renderer* renderer, Vector2D mousePos);
 	void resetGame(SDL_Renderer* renderer);
 	void createTryAgainButton(SDL_Renderer* renderer);
+	void createStartButton(SDL_Renderer* renderer);
+	void showNotification(const std::string& message);
+	void drawNotification(SDL_Renderer* renderer);
 
 	int mouseDownStatus = 0;
 
@@ -73,6 +80,8 @@ private:
 
 	SDL_Texture* textureWin = nullptr;
 	SDL_Texture* textureGameOver = nullptr;
+	SDL_Texture* textureInstructions = nullptr;
+	bool instructionsVisible = true;
 
 	Timer spawnTimer, roundTimer;
 	int spawnUnitCount = 0;
@@ -80,6 +89,14 @@ private:
 	const int maxRounds = 5;
 	const int maxCityHealth = 100;
 	int cityHealth = maxCityHealth;
+
+	// Notification system
+	struct Notification {
+		std::string message;
+		float displayTime = 3.0f;  // How long to show the notification
+		float currentTime = 0.0f;  // Current time remaining
+		bool active = false;
+	} notification;
 
 	Mix_Chunk* mix_ChunkSpawnUnit = nullptr;
 
