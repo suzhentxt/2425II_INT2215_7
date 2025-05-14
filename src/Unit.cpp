@@ -12,7 +12,7 @@ Unit::Unit(SDL_Renderer* renderer, Vector2D setPos, int roundNumber) :
 	pos(setPos), timerJustHurt(0.25f) {
 	texture = TextureLoader::loadTexture(renderer, "Unit.bmp");
 	
-	// Increase speed by 20% each round
+	// Increase speed by 50% each round
 	currentSpeed = baseSpeed * (1.0f + (roundNumber * 0.5f));
 }
 
