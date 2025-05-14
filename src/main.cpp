@@ -40,6 +40,15 @@ int main(int argc, char* args[]) {
 			return 1;
 		}
 		else {
+			// Load and set the window icon
+			SDL_Surface* icon = SDL_LoadBMP("Data/Images/icon.bmp");
+			if (icon == nullptr) {
+				std::cout << "Warning: Couldn't load icon = " << SDL_GetError() << std::endl;
+			} else {
+				SDL_SetWindowIcon(window, icon);
+				SDL_FreeSurface(icon);
+			}
+
 			// Create a renderer
 			SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, 
                                SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);

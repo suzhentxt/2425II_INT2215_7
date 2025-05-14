@@ -24,7 +24,9 @@ SOURCES = src/main.cpp \
           src/Projectile.cpp \
           src/Vector2D.cpp \
           src/MathAddon.cpp \
-          src/BackgroundSelector.cpp
+          src/BackgroundSelector.cpp \
+          src/ResourceManager.cpp \
+          src/UI.cpp
 
 # Tạo danh sách file đối tượng từ danh sách file nguồn
 OBJECTS = $(SOURCES:.cpp=.o)
@@ -38,6 +40,6 @@ $(TARGET): $(OBJECTS)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -f $(OBJECTS) $(TARGET)
+	del /Q /F src\*.o $(TARGET).exe
 
 .PHONY: all clean

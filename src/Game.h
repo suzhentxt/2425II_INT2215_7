@@ -11,8 +11,8 @@
 #include "Projectile.h"
 #include "Level.h"
 #include "Timer.h"
-
-
+#include "ResourceManager.h"
+#include "UI.h"
 
 class Game
 {
@@ -39,21 +39,13 @@ private:
 	// Start Game button
 	struct Button startButton;
 
-	// Resource limits
-	int baseTurretsPerRound = 5;
-	int baseWallsPerRound = 10;
-	int turretIncreasePerRound = 1;
-	int wallIncreasePerRound = 5;
-	int maxTurretsPerRound;
-	int maxWallsPerRound;
-	int remainingTurrets;
-	int remainingWalls;
+	ResourceManager resourceManager;
+	UI* ui = nullptr;
 
 public:
 	// Modified constructor to accept background file name
 	Game(SDL_Window* window, SDL_Renderer* renderer, int windowWidth, int windowHeight, const std::string& backgroundFile = "bg1.bmp");
 	~Game();
-
 
 private:
 	void processEvents(SDL_Renderer* renderer, bool& running);
