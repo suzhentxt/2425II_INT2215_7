@@ -24,8 +24,8 @@ public:
     
     // Setters
     void decrementTurrets() { remainingTurrets--; }
-    void incrementWalls() { remainingWalls++; }
     void decrementWalls() { remainingWalls--; }
+    void incrementWalls() { remainingWalls++; }
     
     // Checkers
     bool hasTurretsRemaining() const { return remainingTurrets > 0; }

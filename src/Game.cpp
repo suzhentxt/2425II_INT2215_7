@@ -12,11 +12,8 @@ Game::Game(SDL_Window* window, SDL_Renderer* renderer, int windowWidth, int wind
     // Initialize UI
     ui = new UI(window, renderer);
 
-    // Initialize resource limits
-    maxTurretsPerRound = baseTurretsPerRound;
-    maxWallsPerRound = baseWallsPerRound;
-    remainingTurrets = maxTurretsPerRound;
-    remainingWalls = maxWallsPerRound;
+    // Initialize resource manager
+    resourceManager.reset();
 
     //Load the font
     font = TTF_OpenFont("D:/Xius/Dev/Game_Project/Data/Fonts/arial.ttf", 24);
