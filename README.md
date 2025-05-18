@@ -13,6 +13,9 @@
   - Xây dựng và đặt các công trình phòng thủ như tường và tháp pháo
   - Kẻ thù sẽ xuất hiện từ 4 góc màn hình và tìm đường tấn công vào thành phố
   - Sử dụng chiến thuật thông minh để chặn đường tiến và tiêu diệt kẻ thù
+- **Điều kiện thắng/thua:**
+  - **Thắng:** Vượt qua 5 đợt tấn công và bảo vệ thành phố an toàn
+  - **Thua:** Thành phố bị phá hủy khi thanh máu giảm xuống 0
 - **Tính năng:**
   - Hệ thống tìm đường tự động cho kẻ thù
   - Hiển thị sức khỏe còn lại của thành phố
