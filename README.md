@@ -6,7 +6,7 @@
 - **Thư viện đồ hoạ:** SDL2
 
 ## Mô tả chi tiết
-City Defense là một game chiến thuật phòng thủ, nơi người chơi sẽ đóng vai trò là người bảo vệ thành phố trung tâm. Trong game này:
+**City Defense** là một game chiến thuật phòng thủ, nơi người chơi sẽ đóng vai trò là người bảo vệ thành phố trung tâm. Trong game này:
 
 - **Mục tiêu:** Bảo vệ thành phố trung tâm khỏi sự tấn công của kẻ thù
 - **Cơ chế chơi:**
